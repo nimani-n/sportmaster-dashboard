@@ -1,0 +1,77 @@
+
+.main {
+    background:#F5F7FB;
+}
+
+.block-container{
+    max-width:1350px;
+    padding-top:2rem;
+    padding-bottom:2rem;
+}
+
+h1,h2,h3{
+    color:#1F2937;
+    font-weight:700;
+}
+
+p{
+    color:#6B7280;
+}
+
+[data-testid="stSidebar"]{
+    background:#FFFFFF;
+    border-right:1px solid #E5E7EB;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3{
+    color:#111827;
+}
+
+[data-testid="stMetric"]{
+    background:white;
+    border-radius:18px;
+    border:1px solid #E5E7EB;
+    padding:1rem;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);
+    transition:.2s ease;
+}
+
+[data-testid="stMetric"]:hover{
+    transform:translateY(-3px);
+    box-shadow:0 14px 28px rgba(0,0,0,.10);
+}
+
+[data-testid="stMetricLabel"]{
+    color:#6B7280;
+    font-weight:600;
+    font-size:0.95rem;
+}
+
+[data-testid="stMetricValue"]{
+    color:#111827;
+    font-weight:800;
+    font-size:2rem;
+}
+
+div[data-testid="stPlotlyChart"]{
+    background:white;
+    border-radius:18px;
+    padding:12px;
+    border:1px solid #E5E7EB;
+    box-shadow:0 6px 20px rgba(0,0,0,.05);
+    margin-bottom:18px;
+}
+
+div[data-testid="stDataFrame"]{
+    background:white;
+    border-radius:18px;
+    border:1px solid #E5E7EB;
+    overflow:hidden;
+}
+
+.stButton>button{
+    border-radius:10px;
+    font-weight:600;
+}

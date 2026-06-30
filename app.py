@@ -1,91 +1,189 @@
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(page_title="Аналитика заказов и кликов", layout="wide")
+from utils.data_loader import load_csv
 
-st.title("📊 Аналитика заказов и кликов")
-st.caption("Интерактивный Python-dashboard: показы баннеров, клики, покупки, mobile/desktop и динамика заказов.")
+st.set_page_config(
+    page_title="Спортмастер — Аналитика заказов",
+    page_icon="📊",
+    layout="wide"
+)
 
-REQUIRED_COLUMNS = {"site_version", "time", "title", "target"}
+def load_css(path):
+    with open(path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("Загрузите CSV-файл product_apr", type=["csv"])
+load_css("assets/styles.css")
+
+st.markdown("""
+<div style="padding-bottom:1rem;">
+<h1 style="margin-bottom:0;">📊 Аналитический дашборд «Спортмастер»</h1>
+<p style="color:#6B7280;font-size:18px;">
+Аналитика заказов, кликов и поведения пользователей
+</p>
+</div>
+""", unsafe_allow_html=True)
+
+uploaded_file = st.file_uploader("Загрузите CSV-файл", type=["csv"])
 
 if uploaded_file is None:
-    st.info("Загрузите CSV с колонками: site_version, time, title, target")
+    st.info("Загрузите CSV-файл для начала анализа.")
     st.stop()
 
-try:
-    df = pd.read_csv(uploaded_file)
-except Exception:
-    uploaded_file.seek(0)
-    df = pd.read_csv(uploaded_file, sep=";")
-
-missing = REQUIRED_COLUMNS - set(df.columns)
-if missing:
-    st.error(f"В файле не хватает колонок: {', '.join(missing)}")
-    st.write("Найденные колонки:", list(df.columns))
-    st.stop()
-
-# Подготовка данных
-df = df.copy()
+df = load_csv(uploaded_file)
 df["time"] = pd.to_datetime(df["time"], errors="coerce")
-df["date"] = df["time"].dt.date
+df["Дата"] = df["time"].dt.date
 
-st.sidebar.header("Фильтры")
-site_options = sorted(df["site_version"].dropna().unique())
-selected_sites = st.sidebar.multiselect("Версия сайта", site_options, default=site_options)
+with st.sidebar:
+    st.header("⚙️ Фильтры")
 
-event_options = sorted(df["title"].dropna().unique())
-selected_events = st.sidebar.multiselect("Тип события", event_options, default=event_options)
+    versions = sorted(df["site_version"].dropna().unique())
+    selected_versions = st.multiselect(
+        "Версия сайта",
+        versions,
+        default=versions
+    )
 
-filtered = df[df["site_version"].isin(selected_sites) & df["title"].isin(selected_events)]
+    events = sorted(df["title"].dropna().unique())
+    selected_events = st.multiselect(
+        "Тип события",
+        events,
+        default=events
+    )
 
-shows = len(filtered[filtered["title"] == "banner_show"])
-clicks = len(filtered[filtered["title"] == "banner_click"])
-orders_df = filtered[(filtered["title"] == "order") | (filtered["target"] == 1)]
+filtered = df[
+    df["site_version"].isin(selected_versions)
+    & df["title"].isin(selected_events)
+]
+
+shows = (filtered["title"]=="banner_show").sum()
+clicks = (filtered["title"]=="banner_click").sum()
+orders_df = filtered[(filtered["title"]=="order") | (filtered["target"]==1)]
 orders = len(orders_df)
-conversion = (orders / clicks * 100) if clicks else 0
+conversion = orders/clicks*100 if clicks else 0
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Показы баннеров", f"{shows:,}".replace(",", " "))
-c2.metric("Клики по баннерам", f"{clicks:,}".replace(",", " "))
-c3.metric("Покупки", f"{orders:,}".replace(",", " "))
-c4.metric("Конверсия клик → покупка", f"{conversion:.1f}%".replace(".", ","))
+st.markdown("## 📈 Ключевые показатели")
 
-st.divider()
+c1,c2,c3,c4 = st.columns(4)
 
-left, right = st.columns(2)
+c1.metric("👁 Показы", f"{shows:,}".replace(","," "))
+c2.metric("🖱 Клики", f"{clicks:,}".replace(","," "))
+c3.metric("🛒 Заказы", f"{orders:,}".replace(","," "))
+c4.metric("🎯 Конверсия", f"{conversion:.2f}%")
+
+left,right = st.columns(2)
 
 with left:
-    st.subheader("Путь клиента: показы → клики → покупки")
-    funnel_df = pd.DataFrame({
-        "Этап": ["Показы", "Клики", "Покупки"],
-        "Количество": [shows, clicks, orders],
+    funnel = pd.DataFrame({
+        "Этап":["Показы","Клики","Заказы"],
+        "Количество":[shows,clicks,orders]
     })
-    fig = px.funnel(funnel_df, x="Количество", y="Этап", title="Воронка событий")
+    fig = px.funnel(
+        funnel,
+        x="Количество",
+        y="Этап",
+        color="Этап",
+        title="Воронка продаж"
+    )
+    fig.update_layout(
+        template="plotly_white",
+        height=430,
+        showlegend=False
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 with right:
-    st.subheader("Клики по версиям сайта")
-    clicks_site = filtered[filtered["title"] == "banner_click"].groupby("site_version").size().reset_index(name="Клики")
-    fig = px.bar(clicks_site, x="site_version", y="Клики", text="Клики", title="Mobile vs Desktop: клики")
+    device = filtered.groupby("site_version").size().reset_index(name="События")
+    fig = px.bar(
+        device,
+        x="site_version",
+        y="События",
+        color="site_version",
+        title="Сравнение версий сайта"
+    )
+    fig.update_layout(
+        template="plotly_white",
+        xaxis_title="Версия сайта",
+        height=430,
+        showlegend=False
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-left2, right2 = st.columns(2)
+col1,col2 = st.columns([2,1])
 
-with left2:
-    st.subheader("Продажи по версиям сайта")
-    orders_site = orders_df.groupby("site_version").size().reset_index(name="Покупки")
-    fig = px.bar(orders_site, x="site_version", y="Покупки", text="Покупки", title="Mobile vs Desktop: покупки")
+with col1:
+    trend = orders_df.groupby("Дата").size().reset_index(name="Заказы")
+    fig = px.line(
+        trend,
+        x="Дата",
+        y="Заказы",
+        markers=True,
+        title="Динамика заказов"
+    )
+    fig.update_layout(template="plotly_white", height=420)
     st.plotly_chart(fig, use_container_width=True)
 
-with right2:
-    st.subheader("Динамика заказов")
-    orders_day = orders_df.dropna(subset=["date"]).groupby("date").size().reset_index(name="Покупки")
-    fig = px.line(orders_day, x="date", y="Покупки", markers=True, title="Количество заказов по датам")
+with col2:
+    events_df = filtered.groupby("title").size().reset_index(name="Количество")
+    fig = px.pie(
+        events_df,
+        names="title",
+        values="Количество",
+        hole=0.55,
+        title="Структура событий"
+    )
+    fig.update_layout(height=420)
     st.plotly_chart(fig, use_container_width=True)
 
-st.divider()
-st.subheader("Предпросмотр данных")
-st.dataframe(filtered.head(100), use_container_width=True)
+st.markdown("## 🧠 Краткие выводы")
+
+best_site = (
+    filtered.groupby("site_version")
+    .size()
+    .sort_values(ascending=False)
+    .index[0]
+)
+
+top_event = (
+    filtered.groupby("title")
+    .size()
+    .sort_values(ascending=False)
+    .index[0]
+)
+
+st.success(f"""
+• Всего обработано **{len(filtered):,}** событий.
+
+• Наиболее активная версия сайта: **{best_site}**.
+
+• Самое частое событие: **{top_event}**.
+
+• Конверсия кликов в заказ составляет **{conversion:.2f}%**.
+""".replace(",", " "))
+
+st.markdown("## 📋 Предпросмотр данных")
+
+preview_rows = st.slider(
+    "Сколько строк показать?",
+    min_value=100,
+    max_value=5000,
+    value=500,
+    step=100
+)
+
+st.dataframe(
+    filtered.head(preview_rows),
+    use_container_width=True,
+    height=500
+)
+
+st.caption(f"Показано {preview_rows} строк из {len(filtered):,}".replace(",", " "))
+
+st.download_button(
+    "⬇ Скачать отфильтрованные данные CSV",
+    filtered.to_csv(index=False).encode("utf-8-sig"),
+    "filtered_sportmaster_data.csv",
+    "text/csv"
+)
